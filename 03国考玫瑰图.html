@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>国考专业招录人数玫瑰图 | 南丁格尔玫瑰图 (2020-2026)</title>
+    <!-- 引入 ECharts 核心库 -->
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: linear-gradient(145deg, #f5f7fc 0%, #eef2f8 100%);
+            font-family: 'Segoe UI', 'Roboto', 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 24px 20px;
+        }
+        .dashboard {
+            max-width: 1400px;
+            width: 100%;
+            background: rgba(255,255,255,0.85);
+            backdrop-filter: blur(2px);
+            border-radius: 48px;
+            box-shadow: 0 25px 45px -12px rgba(0,0,0,0.25), 0 4px 12px rgba(0,0,0,0.05);
+            overflow: hidden;
+            padding: 20px 24px 30px 24px;
+            transition: all 0.2s;
+        }
+        .header {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: baseline;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e0e7f0;
+            padding-bottom: 16px;
+        }
+        .title-section h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, #1e466e, #2b6a9f);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+            letter-spacing: -0.3px;
+        }
+        .title-section p {
+            color: #5a6e8a;
+            font-size: 0.9rem;
+            margin-top: 6px;
+        }
+        .control-panel {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            background: #ffffffcc;
+            backdrop-filter: blur(4px);
+            padding: 8px 20px;
+            border-radius: 60px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        .control-panel label {
+            font-weight: 600;
+            color: #1f3a5f;
+            font-size: 0.95rem;
+        }
+        .year-selector {
+            background: white;
+            border: 1px solid #cbdbe0;
+            padding: 8px 18px;
+            border-radius: 36px;
+            font-size: 1rem;
+            font-weight: 500;
+            color: #0b2b44;
+            cursor: pointer;
+            outline: none;
+            transition: 0.2s;
+            font-family: inherit;
+        }
+        .year-selector:hover {
+            border-color: #2b6a9f;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+        .insight {
+            font-size: 0.8rem;
+            background: #e9f0f9;
+            padding: 6px 14px;
+            border-radius: 28px;
+            color: #175d8f;
+        }
+        .chart-container {
+            width: 100%;
+            height: 650px;
+            margin-top: 12px;
+            background: #ffffffd9;
+            border-radius: 36px;
+            padding: 8px;
+            box-shadow: 0 8px 22px rgba(0, 0, 0, 0.05);
+            transition: all 0.2s;
+        }
+        .footer-note {
+            text-align: center;
+            font-size: 0.75rem;
+            color: #6c7e9e;
+            margin-top: 20px;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 16px;
+        }
+        @media (max-width: 780px) {
+            .dashboard { padding: 16px; }
+            .header { flex-direction: column; gap: 12px; }
+            .control-panel { align-self: flex-start; }
+            .chart-container { height: 520px; }
+            .title-section h1 { font-size: 1.4rem; }
+        }
+        .tooltip-custom {
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+<div class="dashboard">
+    <div class="header">
+        <div class="title-section">
+            <h1>📊 国考专业招录人数 · 南丁格尔玫瑰图</h1>
+            <p>基于2020-2026年招考数据 | 半径长度 = 专业招录人数 (数量越大 辐射越远) | 切换年份查看动态趋势</p>
+        </div>
+        <div class="control-panel">
+            <span class="insight">🎯 玫瑰图展示各专业类别人数差异</span>
+            <label for="yearSelect">📅 选择年份：</label>
+            <select id="yearSelect" class="year-selector">
+                <option value="2020">2020年</option>
+                <option value="2021">2021年</option>
+                <option value="2022">2022年</option>
+                <option value="2023">2023年</option>
+                <option value="2024">2024年</option>
+                <option value="2025">2025年</option>
+                <option value="2026" selected>2026年</option>
+            </select>
+        </div>
+    </div>
+    <div id="roseChart" class="chart-container"></div>
+    <div class="footer-note">
+        ⚡ 专业分类基于教育部学科门类 + 图情档类（含信息资源管理、图书情报硕士）<br>
+        💡 图表中极小扇区（实际招录人数为0）使用微量半径保留扇区以便观察，鼠标悬停显示真实人数
+    </div>
+</div>
+
+<script>
+    // --------------------------------------------------------------
+    // 1. 根据 Excel 整理数据 (专业类别 + 2020~2026 各年份招录人数)
+    //    原始数据取自表格：专业类型 01哲学类 ... 14交叉学科 + 图情档类
+    // --------------------------------------------------------------
+    const majorCategories = [
+        "哲学类", "经济学类", "法学类", "教育学类", "文学类",
+        "历史学类", "理学类", "工学类", "农学类", "医学类",
+        "军事学类", "管理学类", "艺术学类", "交叉学科", "图情档类"
+    ];
+
+    // 严格按照 majorCategories 顺序组织各年份数据 (2020 -> 2026)
+    // 数据来源: 附件表格最后一组专业统计 (01哲学...14交叉学科 + 图情档单独统计)
+    const rawDataByYear = {
+        2020: [
+            362,    // 哲学类
+            5863,   // 经济学类
+            4012,   // 法学类
+            249,    // 教育学类
+            3435,   // 文学类
+            204,    // 历史学类
+            200,    // 理学类
+            99,     // 工学类
+            68,     // 农学类
+            258,    // 医学类
+            4,      // 军事学类
+            3337,   // 管理学类
+            51,     // 艺术学类
+            125,    // 交叉学科
+            438     // 图情档类
+        ],
+        2021: [
+            359, 4743, 3482, 308, 3218,
+            186, 526, 100, 53, 363,
+            4, 3928, 44, 159, 264
+        ],
+        2022: [
+            517, 5210, 4444, 224, 4252,
+            268, 708, 98, 60, 396,
+            12, 3889, 51, 343, 486
+        ],
+        2023: [
+            841, 4960, 3910, 436, 3533,
+            492, 804, 150, 139, 516,
+            32, 6147, 64, 0, 828
+        ],
+        2024: [
+            793, 4343, 4246, 392, 3537,
+            353, 985, 115, 109, 467,
+            48, 5976, 138, 10, 520
+        ],
+        2025: [
+            602, 5906, 3335, 456, 2718,
+            398, 1106, 171, 110, 299,
+            88, 4775, 95, 23, 567
+        ],
+        2026: [
+            446, 5968, 3327, 415, 2665,
+            264, 878, 127, 95, 286,
+            38, 4387, 104, 17, 550
+        ]
+    };
+
+    // 极大值辅助（用于处理半径为0的情况，保留可视性）
+    function getYearMaxValue(yearDataArr) {
+        return Math.max(...yearDataArr, 1);
+    }
+
+    // 生成“展示用的数值” : 如果原始数值 == 0，则替换为该年份最大值的 1.5% 确保有微小扇区可见；
+    // 但为了视觉效果且不过分夸大零值，设定最小半径对应最大值的 0.8% ~ 1% ，同时保证人眼能识别该分类存在。
+    // 同时保留原始值用于 tooltip 展示。
+    function prepareDisplayData(rawArr, year) {
+        const maxVal = getYearMaxValue(rawArr);
+        // 动态最小半径基数: 最大值的 1.2% 但不能低于 0.7 (人眼可见)
+        let minVisible = Math.max(maxVal * 0.012, 0.8);
+        // 如果最大值极小(小于10)，则最小半径取0.5即可
+        if (maxVal < 30) minVisible = Math.max(maxVal * 0.1, 0.5);
+        
+        const displayVals = [];
+        for (let i = 0; i < rawArr.length; i++) {
+            let val = rawArr[i];
+            if (val === 0) {
+                // 零值替换为最小可见值, 保证扇区可见但极短，提示用户真实人数为零
+                displayVals.push(minVisible);
+            } else {
+                displayVals.push(val);
+            }
+        }
+        return { displayVals, maxVal };
+    }
+
+    // 构建玫瑰图配置 (极坐标系 + 玫瑰图)
+    let currentChart = null;
+
+    // 专业名称映射长格式（辅助展示）
+    const majorFullNames = {
+        "哲学类": "哲学类 (01)",
+        "经济学类": "经济学类 (02)",
+        "法学类": "法学类 (03)",
+        "教育学类": "教育学类 (04)",
+        "文学类": "文学类 (05)",
+        "历史学类": "历史学类 (06)",
+        "理学类": "理学类 (07)",
+        "工学类": "工学类 (08)",
+        "农学类": "农学类 (09)",
+        "医学类": "医学类 (10)",
+        "军事学类": "军事学类 (11)",
+        "管理学类": "管理学类 (12)",
+        "艺术学类": "艺术学类 (13)",
+        "交叉学科": "交叉学科 (14)",
+        "图情档类": "图情档类 (1205/1255)"
+    };
+
+    // 渲染玫瑰图
+    function renderRoseChart(year) {
+        if (!currentChart) {
+            currentChart = echarts.init(document.getElementById("roseChart"));
+        }
+        const yearStr = year.toString();
+        const rawValues = rawDataByYear[yearStr];
+        if (!rawValues) return;
+        
+        // 获取 展示数值(处理0值) 和 最大值
+        const { displayVals, maxVal } = prepareDisplayData(rawValues, yearStr);
+        
+        // 构建ECharts玫瑰图数据 series.data 格式: { name, value }
+        const seriesData = [];
+        for (let i = 0; i < majorCategories.length; i++) {
+            const catName = majorCategories[i];
+            const displayVal = displayVals[i];
+            const realVal = rawValues[i];
+            seriesData.push({
+                name: catName,
+                value: displayVal,          // 用于半径长度（可视化映射）
+                realValue: realVal,         // 真实人数
+                fullLabel: majorFullNames[catName] || catName
+            });
+        }
+        
+        // 玫瑰图配置 (半径模式: 面积 / 半径? 这里使用 'radius' 使得半径长度正比于数值，更符合“数量越大半径外延越大”)
+        // 采用极坐标系 + 条形图玫瑰风格
+        const option = {
+            title: {
+                show: false
+            },
+            tooltip: {
+                trigger: 'item',
+                backgroundColor: 'rgba(20,30,45,0.9)',
+                borderColor: '#2c6280',
+                borderWidth: 1,
+                textStyle: { color: '#f0f4fa', fontSize: 13, fontFamily: 'inherit' },
+                formatter: function(params) {
+                    // params.data 包含我们自定义的数据
+                    const data = params.data;
+                    if (!data) return params.name;
+                    const realNum = data.realValue !== undefined ? data.realValue : data.value;
+                    const majorName = data.fullLabel || data.name;
+                    // 特别标注实际为0的情况
+                    let zeroHint = (realNum === 0) ? '⚠️ 实际招录人数为0 (微量扇区仅为可视)' : '';
+                    return `<strong>${majorName}</strong><br/>📌 招录人数: <strong style="color:#ffd966">${realNum.toLocaleString()}</strong> 人${zeroHint ? '<br/>' + zeroHint : ''}<br/>📅 ${yearStr}年`;
+                }
+            },
+            legend: {
+                orient: 'vertical',
+                left: 'left',
+                type: 'scroll',
+                pageIconColor: '#3a6ea5',
+                textStyle: { color: '#2c3e4e', fontWeight: 500 },
+                formatter: function(name) {
+                    return majorFullNames[name] || name;
+                },
+                itemWidth: 20,
+                itemHeight: 12,
+                borderRadius: 8,
+                backgroundColor: 'rgba(255,255,240,0.6)'
+            },
+            series: [
+                {
+                    name: `国考专业招录 (${yearStr}年)`,
+                    type: 'pie',
+                    radius: ['12%', '78%'],      // 内圈稍留白，外圈最大范围凸显差异
+                    center: ['50%', '52%'],
+                    roseType: 'radius',           // 关键: 半径模式，数值越大半径延伸越长
+                    data: seriesData,
+                    avoidLabelOverlap: false,
+                    itemStyle: {
+                        borderRadius: 10,
+                        borderColor: '#fff',
+                        borderWidth: 1.5,
+                        shadowBlur: 12,
+                        shadowOffsetX: 2,
+                        shadowOffsetY: 2,
+                        shadowColor: 'rgba(0,0,0,0.15)'
+                    },
+                    label: {
+                        show: true,
+                        rotate: 0,
+                        position: 'outside',
+                        formatter: function(params) {
+                            const originVal = params.data.realValue;
+                            if (originVal === 0) return `${params.name}\n(0人)`;
+                            // 显示名字+缩略人数 (如果人数极大，显示简写)
+                            if (originVal >= 5000) return `${params.name}\n${(originVal/1000).toFixed(1)}k人`;
+                            if (originVal >= 1000) return `${params.name}\n${(originVal/1000).toFixed(1)}k`;
+                            return `${params.name}\n${originVal}人`;
+                        },
+                        fontSize: 11,
+                        fontWeight: 500,
+                        color: '#1e3a5f',
+                        lineHeight: 16,
+                        fontFamily: 'system-ui, "Segoe UI"',
+                        bleedMargin: 8,
+                        rich: {
+                            name: { fontSize: 11, fontWeight: 'bold' }
+                        }
+                    },
+                    emphasis: {
+                        scale: true,
+                        label: { show: true, fontWeight: 'bold', fontSize: 12, backgroundColor: '#ffffffcc' }
+                    },
+                    tooltip: { 
+                        // 继承全局tooltip, 但可单独定制
+                    },
+                    // 自定义颜色方案——清新明快专业色盘 (高饱和度区分度)
+                    color: [
+                        '#5470c6', '#fac858', '#ee6666', '#73c0de', '#3ba272',
+                        '#fc8452', '#9a60b4', '#ea7ccc', '#4b9b5e', '#f5a97f',
+                        '#6a4e9b', '#69b0b0', '#e8916e', '#b882c2', '#d48265'
+                    ],
+                    labelLine: {
+                        length: 10,
+                        length2: 12,
+                        smooth: true,
+                        lineStyle: { width: 1, color: '#8ba3c7' }
+                    }
+                }
+            ],
+            graphic: [
+                {
+                    type: 'text',
+                    left: 'center',
+                    top: 18,
+                    style: {
+                        text: `⭐ ${yearStr} 年各专业大类招录人数分布`,
+                        fill: '#1f4970',
+                        fontSize: 16,
+                        fontWeight: 'bold',
+                        fontFamily: 'system-ui'
+                    },
+                    z: 100
+                },
+                {
+                    type: 'text',
+                    left: 'center',
+                    top: 48,
+                    style: {
+                        text: `半径长度正比于招录人数 | 人数越多辐射越远`,
+                        fill: '#6c86a3',
+                        fontSize: 11,
+                    },
+                    z: 100
+                }
+            ],
+            // 背景风格优化
+            backgroundColor: 'transparent',
+            toolbox: {
+                show: true,
+                feature: {
+                    saveAsImage: { title: '保存为图片', backgroundColor: '#ffffff' },
+                    restore: { title: '重置' }
+                },
+                right: 20,
+                top: 10,
+                iconSize: 18
+            }
+        };
+        
+        currentChart.setOption(option, true);
+        // 响应resize
+        window.addEventListener('resize', () => { currentChart && currentChart.resize(); });
+    }
+    
+    // 监听年份下拉框变化
+    const yearSelect = document.getElementById('yearSelect');
+    function initChart() {
+        const defaultYear = yearSelect.value;   // 2026 selected
+        renderRoseChart(defaultYear);
+        yearSelect.addEventListener('change', (e) => {
+            renderRoseChart(e.target.value);
+        });
+    }
+    
+    // 启动渲染
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initChart);
+    } else {
+        initChart();
+    }
+    
+    // 增加一个额外的细节: 在控制台输出数据校验 (方便确认原始数据)
+    console.log("玫瑰图专业数据加载完成，包含15个专业类别，2020-2026完整招录数据。");
+    // 可选: 输出2026年数据样本核对
+    console.log("2026年专业招录原始数据(参考):", rawDataByYear[2026]);
+</script>
+</body>
+</html>
